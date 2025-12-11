@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Jardikovo svět plný her, ai a minerálů</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #00fff7;
+      --secondary: #a259ff;
+      --accent: #1e90ff;
+      --background: #0a0f1c;
+      --card-bg: rgba(20, 30, 50, 0.85);
+      --font-size: 1rem;
+      --transition: 0.25s cubic-bezier(.4,0,.2,1);
+    }
+    body {
+      background: linear-gradient(120deg, #0a0f1c 0%, #1e233a 100%);
+      color: #f7f8fa;
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: var(--font-size);
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: row;
+    }
+    .sidebar {
+      width: 220px;
+      background: var(--card-bg);
+      padding: 2rem 1rem;
+      box-shadow: 2px 0 16px rgba(0,255,247,0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      min-height: 100vh;
+    }
+    .sidebar-title {
+      font-size: 1.2rem;
+      color: var(--primary);
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    .folder {
+      background: #181c2b;
+      color: var(--secondary);
+      border-radius: 12px;
+      padding: 0.8rem 1rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0,255,247,0.08);
+      margin-bottom: 0.5rem;
+      border: 2px solid transparent;
+      transition: box-shadow var(--transition), background var(--transition), border var(--transition);
+    }
+    .folder.selected {
+      border-color: var(--primary);
+      background: #101522;
+      color: var(--primary);
+    }
+    .main-content {
+      flex: 1;
+      padding: 2rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 2rem;
+      text-align: center;
+      text-shadow: 0 2px 12px var(--primary);
+    }
+    .file-upload {
+      margin: 1rem 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .file-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      justify-content: center;
+    }
+    .file-item {
+      background: #181c2b;
+      color: #fff;
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      box-shadow: 0 2px 8px rgba(0,255,247,0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .img-preview {
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      box-shadow: 0 2px 8px var(--primary);
+    }
+    .audio-player, .video-player {
+      width: 100%;
+      max-width: 400px;
+      margin: 1rem auto;
+      display: block;
+    }
+    @media (max-width: 900px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100vw; min-height: 0; flex-direction: row; justify-content: center; }
+      .main-content { padding: 1rem 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-title">Složky</div>
+    <div class="folder" data-folder="Kameny" id="folder-kameny">Kameny</div>
+    <div class="folder" data-folder="Ai obrázky" id="folder-ai">Ai obrázky</div>
+    <div class="folder" data-folder="Hudba" id="folder-hudba">Hudba</div>
+    <div class="folder" data-folder="Hry" id="folder-hry">Hry</div>
+  </div>
+  <div class="main-content">
+    <div class="section-title" id="main-title">Jardikovo svět plný her, ai a minerálů</div>
+    <div id="folder-content"></div>
+  </div>
+  <script>
+    // Data pro složky (v paměti, neukládá se na disk)
+    const data = {
+      'Kameny': { files: [] },
+      'Ai obrázky': { files: [] },
+      'Hudba': { files: [] },
+      'Hry': { files: [] }
+    };
+    let currentFolder = 'Kameny';
+    function selectFolder(folder) {
+      currentFolder = folder;
+      document.querySelectorAll('.folder').forEach(f => f.classList.remove('selected'));
+      document.querySelector(`.folder[data-folder="${folder}"]`).classList.add('selected');
+      renderFolderContent(folder);
+    }
+    function renderFolderContent(folder) {
+      const content = document.getElementById('folder-content');
+      content.innerHTML = '';
+      const files = data[folder].files;
+      // Nahrávací nástroje pro Kameny, Ai obrázky, Hudba
+      if(folder === 'Kameny' || folder === 'Ai obrázky') {
+        const uploadDiv = document.createElement('div');
+        uploadDiv.className = 'file-upload';
+        uploadDiv.innerHTML = `<label>Vložit obrázky:</label><input type="file" id="img-upload-input" multiple accept="image/*"><button id="img-upload-btn">Vložit</button>`;
+        content.appendChild(uploadDiv);
+        uploadDiv.querySelector('#img-upload-btn').onclick = () => {
+          const input = uploadDiv.querySelector('#img-upload-input');
+          if(input.files.length === 0) return alert('Vyberte obrázek!');
+          for(let file of input.files) {
+            const url = URL.createObjectURL(file);
+            data[folder].files.push({ name: file.name, type: 'image', src: url });
+          }
+          renderFolderContent(folder);
+        };
+      }
+      if(folder === 'Hudba') {
+        const uploadDiv = document.createElement('div');
+        uploadDiv.className = 'file-upload';
+        uploadDiv.innerHTML = `<label>Vložit hudbu:</label><input type="file" id="media-upload-input" multiple accept="audio/*,video/*"><button id="media-upload-btn">Vložit</button>`;
+        content.appendChild(uploadDiv);
+        uploadDiv.querySelector('#media-upload-btn').onclick = () => {
+          const input = uploadDiv.querySelector('#media-upload-input');
+          if(input.files.length === 0) return alert('Vyberte soubor!');
+          for(let file of input.files) {
+            const url = URL.createObjectURL(file);
+            let type = file.type.startsWith('audio/') ? 'audio' : file.type.startsWith('video/') ? 'video' : 'other';
+            data[folder].files.push({ name: file.name, type, src: url });
+          }
+          renderFolderContent(folder);
+        };
+      }
+      // Galerie/prohlížeč souborů s možností mazání a úprav
+      const galleryDiv = document.createElement('div');
+      galleryDiv.className = 'file-list';
+      files.forEach((file, idx) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `<div style='font-weight:600;'>${file.name}</div>`;
+        if (file.type === 'image') {
+          item.innerHTML += `<div style='position:relative;width:100%;display:flex;flex-direction:column;align-items:center;'>
+            <img src="${file.src}" class="img-preview" alt="${file.name}" style="cursor:pointer;max-width:90vw;max-height:400px;transition:transform 0.2s;" id="img-${idx}">
+            <div style='margin-top:0.5rem;display:flex;gap:0.5rem;'>
+              <button onclick='window.rotateImg(${idx})'>↻ Otočit</button>
+              <button onclick='window.zoomImg(${idx},1.2)'>+</button>
+              <button onclick='window.zoomImg(${idx},0.8)'>-</button>
+              <button onclick='window.deleteFile("${folder}",${idx})' style='color:#e74c3c;'>Smazat</button>
+            </div>
+          </div>`;
+        }
+        if (file.type === 'audio') {
+          item.innerHTML += `<audio controls class="audio-player" id="audio-${idx}" style="width:95vw;max-width:1200px;height:60px;margin:0.5rem 0;"><source src="${file.src}" type="audio/mpeg"></audio>`;
+          item.innerHTML += `<button onclick='window.deleteFile("${folder}",${idx})' style='color:#e74c3c;margin-top:0.5rem;'>Smazat</button>`;
+        }
+        if (file.type === 'video') {
+          item.innerHTML += `<video controls class="video-player" id="video-${idx}" style="width:95vw;max-width:1200px;height:400px;margin:0.5rem 0;"><source src="${file.src}" type="video/mp4"></video>`;
+          item.innerHTML += `<button onclick='window.deleteFile("${folder}",${idx})' style='color:#e74c3c;margin-top:0.5rem;'>Smazat</button>`;
+        }
+        galleryDiv.appendChild(item);
+      });
+      content.appendChild(galleryDiv);
+      // Globální funkce pro editaci/mazání obrázků
+      window.rotateImg = function(idx) {
+        const img = document.getElementById('img-'+idx);
+        if(!img) return;
+        img.style.transform = (img.style.transform||'') + ' rotate(90deg)';
+      };
+      window.zoomImg = function(idx, factor) {
+        const img = document.getElementById('img-'+idx);
+        if(!img) return;
+        let scale = img.getAttribute('data-scale') ? parseFloat(img.getAttribute('data-scale')) : 1;
+        scale *= factor;
+        img.setAttribute('data-scale', scale);
+        img.style.transform = (img.style.transform||'').replace(/scale\([^)]+\)/,'') + ` scale(${scale})`;
+      };
+      window.deleteFile = function(folder, idx) {
+        data[folder].files.splice(idx,1);
+        renderFolderContent(folder);
+      };
+      // Galerie obrázků pro složky s obrázky
+      if(files.some(f => f.type === 'image')) {
+        const galleryBtn = document.createElement('button');
+        galleryBtn.textContent = 'Zobrazit galerii obrázků';
+        galleryBtn.style.margin = '1rem';
+        galleryBtn.onclick = () => showGallery(files.filter(f => f.type === 'image'));
+        content.appendChild(galleryBtn);
+      }
+      // Minihra Vlak (Snake) pro složku Hry
+      if(folder === 'Hry') {
+        const gameDiv = document.createElement('div');
+        gameDiv.style.margin = '2rem auto';
+        gameDiv.style.display = 'flex';
+        gameDiv.style.flexDirection = 'column';
+        gameDiv.style.alignItems = 'center';
+        gameDiv.innerHTML = `
+          <div style='margin-bottom:1rem;'>
+            <button id='snake-start' style='background:var(--primary);color:#222;font-weight:700;border:none;border-radius:8px;padding:0.7rem 1.5rem;margin-right:1rem;cursor:pointer;box-shadow:0 2px 8px var(--primary);transition:background 0.2s;'>Start</button>
+            <button id='snake-pause' style='background:var(--secondary);color:#fff;font-weight:700;border:none;border-radius:8px;padding:0.7rem 1.5rem;margin-right:1rem;cursor:pointer;box-shadow:0 2px 8px var(--secondary);transition:background 0.2s;'>Pauza</button>
+            <button id='snake-stop' style='background:#e74c3c;color:#fff;font-weight:700;border:none;border-radius:8px;padding:0.7rem 1.5rem;cursor:pointer;box-shadow:0 2px 8px #e74c3c;transition:background 0.2s;'>Stop</button>
+          </div>
+          <canvas id='snake-canvas' width='1200' height='750' style='background:#222;border:4px solid var(--primary);border-radius:16px;box-shadow:0 4px 32px var(--primary);'></canvas>
+          <div id='snake-score' style='color:var(--primary);font-size:1.3rem;margin:1rem;'>Skóre: 0</div>
+          <div style='color:#fff;margin-bottom:1rem;'>Ovládání: šipky nebo tlačítka</div>
+        `;
+        content.appendChild(gameDiv);
+        startSnakeGame();
+      }
+          // Minihra Vlak (Snake)
+    // Minihra Vlak (Snake) s ovládacími tlačítky
+    function startSnakeGame() {
+      const canvas = document.getElementById('snake-canvas');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const box = 25;
+      const rows = Math.floor(canvas.height/box);
+      const cols = Math.floor(canvas.width/box);
+      let snake = [{x:Math.floor(cols/2),y:Math.floor(rows/2)}];
+      let direction = 'RIGHT';
+      let food = {x:Math.floor(Math.random()*cols),y:Math.floor(Math.random()*rows)};
+      let score = 0;
+      let running = false;
+      let paused = false;
+      let interval = null;
+      function draw() {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        // Food
+        ctx.fillStyle = '#00fff7';
+        ctx.fillRect(food.x*box,food.y*box,box,box);
+        // Snake
+        for(let i=0;i<snake.length;i++) {
+          ctx.fillStyle = i===0 ? '#a259ff' : '#fff';
+          ctx.fillRect(snake[i].x*box,snake[i].y*box,box,box);
+          ctx.strokeStyle = '#0a0f1c';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(snake[i].x*box,snake[i].y*box,box,box);
+        }
+        document.getElementById('snake-score').textContent = 'Skóre: '+score;
+      }
+      function update() {
+        if(!running || paused) return;
+        let head = {...snake[0]};
+        if(direction==='LEFT') head.x--;
+        if(direction==='RIGHT') head.x++;
+        if(direction==='UP') head.y--;
+        if(direction==='DOWN') head.y++;
+        // Konec hry
+        if(head.x<0||head.x>=cols||head.y<0||head.y>=rows||snake.some(s=>s.x===head.x&&s.y===head.y)) {
+          running=false;
+          clearInterval(interval);
+          setTimeout(()=>alert('Konec hry! Skóre: '+score),100);
+          return;
+        }
+        snake.unshift(head);
+        // Sníst jídlo
+        if(head.x===food.x&&head.y===food.y) {
+          score++;
+          food={x:Math.floor(Math.random()*cols),y:Math.floor(Math.random()*rows)};
+        } else {
+          snake.pop();
+        }
+        draw();
+      }
+      function start() {
+        if(running) return;
+        running = true;
+        paused = false;
+        interval = setInterval(update,120);
+      }
+      function pause() {
+        paused = !paused;
+      }
+      function stop() {
+        running = false;
+        paused = false;
+        clearInterval(interval);
+        // Reset
+        snake = [{x:Math.floor(cols/2),y:Math.floor(rows/2)}];
+        direction = 'RIGHT';
+        food = {x:Math.floor(Math.random()*cols),y:Math.floor(Math.random()*rows)};
+        score = 0;
+        draw();
+      }
+      document.getElementById('snake-start').onclick = start;
+      document.getElementById('snake-pause').onclick = pause;
+      document.getElementById('snake-stop').onclick = stop;
+      document.onkeydown = function(e) {
+        if(e.key==='a'&&direction!=='RIGHT') direction='LEFT';
+        if(e.key==='w'&&direction!=='DOWN') direction='UP';
+        if(e.key==='d'&&direction!=='LEFT') direction='RIGHT';
+        if(e.key==='s'&&direction!=='UP') direction='DOWN';
+      };
+      draw();
+    }
+      // Přehrávač pro Hudba
+      if(folder === 'Hudba') {
+        // již je v seznamu, není třeba extra
+      }
+      // Upload handler (jednotlivý)
+      uploadDiv.querySelector('#upload-btn').onclick = () => {
+        const input = uploadDiv.querySelector('#upload-input');
+        if(input.files.length === 0) return alert('Vyberte soubor!');
+        for(let file of input.files) {
+          const url = URL.createObjectURL(file);
+          let type = 'other';
+          if(file.type.startsWith('image/')) type = 'image';
+          else if(file.type.startsWith('audio/')) type = 'audio';
+          else if(file.type.startsWith('video/')) type = 'video';
+          data[folder].files.push({ name: file.name, type, src: url });
+        }
+        renderFolderContent(folder);
+      };
+      // Hromadné nahrání obrázků/souborů
+      uploadDiv.querySelector('#multi-upload-input').onchange = (e) => {
+        const files = e.target.files;
+        if(!files.length) return;
+        for(let file of files) {
+          const url = URL.createObjectURL(file);
+          let type = 'other';
+          if(file.type.startsWith('image/')) type = 'image';
+          else if(file.type.startsWith('audio/')) type = 'audio';
+          else if(file.type.startsWith('video/')) type = 'video';
+          data[folder].files.push({ name: file.name, type, src: url });
+        }
+        renderFolderContent(folder);
+      };
+      // Prohlížeč obrázků
+      function showGallery(images) {
+        if(images.length === 0) return alert('Žádné obrázky!');
+        let idx = 0;
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = 0;
+        overlay.style.left = 0;
+        overlay.style.width = '100vw';
+        overlay.style.height = '100vh';
+        overlay.style.background = 'rgba(0,0,0,0.85)';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.zIndex = 9999;
+        overlay.innerHTML = `<button id="prevImg" style="position:absolute;left:5vw;top:50%;font-size:2rem;">◀</button><img id="galImg" src="${images[0].src}" style="max-width:80vw;max-height:80vh;border-radius:16px;box-shadow:0 4px 32px var(--primary);"><button id="nextImg" style="position:absolute;right:5vw;top:50%;font-size:2rem;">▶</button><button id="closeGal" style="position:absolute;top:5vh;right:5vw;font-size:2rem;">✖</button>`;
+        document.body.appendChild(overlay);
+        const galImg = overlay.querySelector('#galImg');
+        overlay.querySelector('#prevImg').onclick = () => { idx = (idx-1+images.length)%images.length; galImg.src = images[idx].src; };
+        overlay.querySelector('#nextImg').onclick = () => { idx = (idx+1)%images.length; galImg.src = images[idx].src; };
+        overlay.querySelector('#closeGal').onclick = () => overlay.remove();
+      }
+    }
+    // Složky klik
+    document.querySelectorAll('.folder').forEach(f => f.onclick = () => selectFolder(f.dataset.folder));
+    // Výchozí zobrazení
+    selectFolder(currentFolder);
+  </script>
+</body>
+</html>
